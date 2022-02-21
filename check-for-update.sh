@@ -9,8 +9,8 @@ if [ -z ${GITHUB_TOKEN+x} ] || [ "$GITHUB_TOKEN" = "" ]; then
   exit 1
 fi
 
-quickdocs_version=$(curl -sL https://storage.googleapis.com/quickdocs-dist/quicklisp/info.json | jq -r '.latest_version')
-quicklisp_version=$(curl -s -L http://beta.quicklisp.org/dist/quicklisp.txt | grep '^version: ' | sed -e 's/version: //')
+quickdocs_version=$(curl -sSL https://storage.googleapis.com/quickdocs-dist/quicklisp/info.json | jq -r '.latest_version')
+quicklisp_version=$(curl -sSL http://beta.quicklisp.org/dist/quicklisp.txt | grep '^version: ' | sed -e 's/version: //')
 
 if [ "$quickdocs_version" = "$quicklisp_version" ]; then
   echo "No updates until the version '$quickdocs_version'."
@@ -18,6 +18,20 @@ if [ "$quickdocs_version" = "$quicklisp_version" ]; then
 fi
 
 echo "Found a new dist version '$quicklisp_version'"
+latest_github_deployment=$(curl -sSL -H 'Authorization: token $GITHUB_TOKEN' \
+  -H 'Accept: application/vnd.github.v3+json' \
+  https://api.github.com/repos/${GITHUB_REPOSITORY}/deployments?environment=production \
+  | jq -cM '.[0]')
+if [ "$(echo $latest_github_deployment | jq -Mr '.payload.version')" = "${quicklisp_version}" ]; then
+  latest_github_deployment_state=$(curl -sSL -H 'Authorization: token $GITHUB_TOKEN' \
+    -H 'Accept: application/vnd.github.v3+json' \
+    "$(echo $latest_github_deployment | jq -Mr '.statuses_url')" | jq -Mr '.[0].state')
+  if [ "$latest_github_deployment_state" = "in_progress" ] || [ "$latest_github_deployment_state" = "null" ]; then
+    echo "Deployment is already running."
+    exit
+  fi
+fi
+
 echo "Creating a deployment."
 github_deployment=$(curl -s -X POST \
   -H "Authorization: token $GITHUB_TOKEN" \
