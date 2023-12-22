@@ -12,6 +12,11 @@ fi
 quickdocs_version=$(curl -sSL https://storage.googleapis.com/quickdocs-dist/quicklisp/info.json | jq -r '.latest_version')
 quicklisp_version=$(curl -sSL http://beta.quicklisp.org/dist/quicklisp.txt | grep '^version: ' | sed -e 's/version: //')
 
+if [ -z "$quickdocs_version" ] || [ -z "$quicklisp_version" ]; then
+  echo "Failed to fetch versions (Quickdocs $quickdocs_version / Quicklisp $quicklisp_version)"
+  exit 1
+fi
+
 if [ "$quickdocs_version" = "$quicklisp_version" ]; then
   echo "No updates until the version '$quickdocs_version'."
   exit
